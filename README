@@ -1,0 +1,59 @@
+Description:
+This tool creates a statistical memory reuse distance profile using the intel pin toolkit. Function information is generated so that reuse profiles can be generated for each function. The reuse distance is calculated by tracking how many memory reads occur between accesses between same memory locations. Only memory reads are tracked as it is unclear if memory writes are written to cache or sent directly to a write buffer. Will add this as an option in the future.
+
+The lines of output generated will be in one of the following formats:
+function_address image_name function_name
+bool_function_start/stop function_address
+reuse_distance
+
+The python script sc2rdat.py will format the output into a tab delimitated format with precomputed reuse bins. 
+
+Place under:
+pin Tool dir/source/tools/
+
+type `make` to build
+
+example:
+../../../pin -t obj-intel64/cacheStat.so  -- ls
+
+options:
+
+-m  [default 4]
+	Maximum number of addresses to track
+-o  [default statCache.out]
+	specify output file
+-r  [default 1]
+	Random sample
+-s  [default 100000]
+	Average sample rate
+-t  [default 1000000]
+	Max tracking length
+
+example: 
+
+../../../pin -t obj-intel64/cacheStat.so  -o ls.statCache.out -m 8 -r 0 -s 2000 -t 100000 -- ls
+
+Slowdown is roughly proportional to the number of simultaneous addresses to track. Maximum is 10.
+
+Setting -r option to 0 sets fixed interval sampling defined by option -s
+
+*****
+After an output file is generated, use the sc2rdat.py to generate histogram data.
+
+cat statCache.out | python sc2rdat.py > histogram.dat
+
+* Tip, use pypy for about a 6x speedup
+
+Some useful R commands to generate the histograms:
+
+library(ggplot2)
+d = read.delim("histogram.dat")
+# raw histogram
+p = ggplot(data=subset(d, valid==1), aes(x=factor(bin),y=count))
+print(p + geom_bar() + facet_wrap(~name))
+
+# scaled histogram
+d1 = ddply(d, .(address), transform, scaled = count/sum(count), total = sum(count))
+p1 = ggplot(data=subset(d1, valid==1 & total > 100), aes(x=factor(bin),y=scaled))
+print(p1 + geom_bar() + facet_wrap(~name))
+
